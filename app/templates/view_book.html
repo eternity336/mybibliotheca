@@ -488,6 +488,36 @@
   </form>
 </div>
 
+<!-- Comments Section -->
+<div class="comments-section">
+  <h4 style="color: var(--primary-brown); margin-bottom: 1.5rem;">💬 Comments</h4>
+
+  <form method="post" action="{{ url_for('main.view_book', uid=book.uid) }}">
+    {{ form.csrf_token }}
+    <div class="form-group">
+      {{ form.text.label(class="form-label") }}
+      {{ form.text(class="form-control", rows=4) }}
+    </div>
+    <button type="submit" class="btn-primary-custom">Add Comment</button>
+  </form>
+
+  <hr>
+
+  {% if comments %}
+    <div class="comment-list">
+      {% for comment in comments %}
+        <div class="comment-item">
+          <p><strong>{{ comment.user.username }}</strong> - <small>{{ comment.created_at.strftime('%Y-%m-%d %H:%M') }}</small></p>
+          <p>{{ comment.text }}</p>
+        </div>
+      {% endfor %}
+    </div>
+  {% else %}
+    <p>No comments yet. Be the first to comment!</p>
+  {% endif %}
+</div>
+
+
 <!-- Actions Section -->
 <div class="actions-section">
   <a href="{{ url_for('main.edit_book', uid=book.uid) }}" class="btn-primary-custom" style="text-decoration: none;">

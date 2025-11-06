@@ -146,3 +146,8 @@ class ReadingStreakForm(FlaskForm):
         }
     )
     submit = SubmitField('Update Streak Settings', render_kw={'class': 'btn btn-primary'})
+
+
+class CommentForm(FlaskForm):
+    text = TextAreaField('Comment', validators=[DataRequired()])
+    submit = SubmitField('Add Comment')

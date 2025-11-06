@@ -1,0 +1,22 @@
+services:
+  MyBibliotheca:
+    image: pickles4evaaaa/mybibliotheca:1.1.1
+    ports:
+      - "5054:5054"
+    volumes:
+      # To change the data directory, change MyBibliotheca_data to your desired location on your local machine
+      # and ensure the application has write permissions to that directory.
+      - mybibliotheca_data:/app/data
+    environment:
+      # Security - MUST be set via .env file or environment
+      - SECRET_KEY=${SECRET_KEY}
+      - SECURITY_PASSWORD_SALT=${SECURITY_PASSWORD_SALT}
+      
+      # Application settings
+      - TIMEZONE=${TIMEZONE:-UTC}
+      - WORKERS=${WORKERS:-4}
+    restart: unless-stopped
+
+volumes:
+  mybibliotheca_data:
+    driver: local

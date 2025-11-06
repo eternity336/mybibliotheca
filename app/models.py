@@ -237,3 +237,18 @@ class ReadingLog(db.Model):
     
     def __repr__(self):
         return f'<ReadingLog {self.user_id}:{self.book_id} on {self.date}>'
+
+class Comment(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    text = db.Column(db.Text, nullable=False)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    book_id = db.Column(db.Integer, db.ForeignKey('book.id'), nullable=False)
+
+    user = db.relationship('User', backref=db.backref('comments', lazy=True))
+    book = db.relationship('Book', backref=db.backref('comments', lazy=True))
+
+    def __repr__(self):
+        return f'<Comment {self.id} by User {self.user_id}>'
+    
+    

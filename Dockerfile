@@ -74,7 +74,7 @@ RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 EXPOSE 5054
 
 # Use custom entrypoint that handles migration
-ENTRYPOINT ["docker-entrypoint.sh"]
+# ENTRYPOINT ["docker-entrypoint.sh"]
 
 # Start the app with Gunicorn in production mode
 # Use WORKERS environment variable for Gunicorn workers Default to 6 workers if not specified

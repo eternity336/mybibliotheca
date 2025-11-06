@@ -1,6 +1,7 @@
 from flask import Blueprint, current_app, render_template, request, redirect, url_for, jsonify, flash, send_file
 from flask_login import login_required, current_user
-from .models import Book, db, ReadingLog, User
+from .models import Book, db, ReadingLog, User, Comment
+from .forms import CommentForm
 from .utils import fetch_book_data, get_reading_streak, get_google_books_cover, generate_month_review_image
 from datetime import datetime, date, timedelta
 import secrets
@@ -241,16 +242,22 @@ def add_book():
 def view_book(uid):
     book = Book.query.filter_by(uid=uid, user_id=current_user.id).first_or_404()
     cover_url = book.cover_url  # Use the saved cover_url
-    if request.method == 'POST':
-        # Update start/finish dates
-        start_date_str = request.form.get('start_date')
-        finish_date_str = request.form.get('finish_date')
-        book.start_date = datetime.strptime(start_date_str, '%Y-%m-%d').date() if start_date_str else None
-        book.finish_date = datetime.strptime(finish_date_str, '%Y-%m-%d').date() if finish_date_str else None
+
+    form = CommentForm()
+    if form.validate_on_submit():
+        comment = Comment(
+            text=form.text.data,
+            user_id=current_user.id,
+            book_id=book.id
+        )
+        db.session.add(comment)
         db.session.commit()
-        flash('Book dates updated.')
+        flash('Your comment has been added.', 'success')
         return redirect(url_for('main.view_book', uid=book.uid))
-    return render_template('view_book.html', book=book, cover_url=cover_url)
+
+    comments = Comment.query.filter_by(book_id=book.id).order_by(Comment.created_at.desc()).all()
+
+    return render_template('view_book.html', book=book, cover_url=cover_url, comments=comments, form=form)
 
 @bp.route('/book/<uid>/log', methods=['POST'])
 @login_required
