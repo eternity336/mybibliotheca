@@ -1,6 +1,7 @@
 services:
   mybibliotheca:
     build: .
+    image: biblio:latest
     ports:
       - "5054:5054"
     volumes:
@@ -8,7 +9,7 @@ services:
     environment:
       - SECRET_KEY=${SECRET_KEY}
       - SECURITY_PASSWORD_SALT=${SECURITY_PASSWORD_SALT}
-      - TIMEZONE=${TIMEZONE:-UTC}
+      - TIMEZONE=American/Chicagp
       - WORKERS=${WORKERS:-4}
     restart: unless-stopped
 

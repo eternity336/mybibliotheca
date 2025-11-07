@@ -222,33 +222,31 @@ class Book(db.Model):
 
 class ReadingLog(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    book_id = db.Column(db.Integer, db.ForeignKey('book.id'), nullable=False)
+    book_isbn = db.Column(db.String, nullable=False)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     date = db.Column(db.Date, nullable=False)
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
 
-    book = db.relationship('Book', backref=db.backref('reading_logs', lazy=True))
     user = db.relationship('User', backref=db.backref('reading_logs', lazy=True))
     
     # Ensure unique log per user per book per date
     __table_args__ = (
-        db.UniqueConstraint('user_id', 'book_id', 'date', name='unique_user_book_date'),
+        db.UniqueConstraint('user_id', 'book_isbn', 'date', name='unique_user_book_date'),
     )
     
     def __repr__(self):
-        return f'<ReadingLog {self.user_id}:{self.book_id} on {self.date}>'
+        return f'<ReadingLog {self.user_id}:{self.book_isbn} on {self.date}>'
 
 class Comment(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     text = db.Column(db.Text, nullable=False)
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
-    book_id = db.Column(db.Integer, db.ForeignKey('book.id'), nullable=False)
+    book_isbn = db.Column(db.String, nullable=False)
 
     user = db.relationship('User', backref=db.backref('comments', lazy=True))
-    book = db.relationship('Book', backref=db.backref('comments', lazy=True))
 
     def __repr__(self):
-        return f'<Comment {self.id} by User {self.user_id}>'
+        return f'<Comment {self.id} by User {self.user_id} on ISBN {self.book_isbn}>'
     
     

@@ -15,6 +15,7 @@ gunicorn
 psutil==5.9.0
 scrypt==0.8.24
 cryptography>=3.4.8
+openpyxl==3.1.2
 
 # Testing dependencies
 pytest==7.4.3

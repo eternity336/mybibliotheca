@@ -268,3 +268,85 @@ def process_book_data(book_data):
         book_data['thumbnail_url'] = ensure_https_url(book_data['thumbnail_url'])
     
     return book_data
+
+
+def process_excel_import(row):
+    """Process a single row from an Excel import."""
+    try:
+        # Unpack the row with proper validation
+        (
+            title, author, isbn, start_date_str, finish_date_str,
+            want_to_read_str, library_only_str, description,
+            published_date, page_count_str, categories, publisher,
+            language, average_rating_str, rating_count_str
+        ) = row
+
+        # --- Data Validation and Sanitization ---
+
+        # ISBN is required
+        if not isbn:
+            return None, "Missing ISBN"
+
+        # Convert dates, handling potential errors
+        start_date = None
+        if start_date_str:
+            try:
+                start_date = datetime.strptime(str(start_date_str), '%Y-%m-%d').date()
+            except (ValueError, TypeError):
+                return None, f"Invalid start date format for ISBN {isbn}"
+
+        finish_date = None
+        if finish_date_str:
+            try:
+                finish_date = datetime.strptime(str(finish_date_str), '%Y-%m-%d').date()
+            except (ValueError, TypeError):
+                return None, f"Invalid finish date format for ISBN {isbn}"
+
+        # Convert booleans from various possible string/numeric values
+        want_to_read = str(want_to_read_str).lower() in ['true', '1', 'yes']
+        library_only = str(library_only_str).lower() in ['true', '1', 'yes']
+
+        # Convert numeric fields, handling potential errors
+        page_count = None
+        if page_count_str:
+            try:
+                page_count = int(page_count_str)
+            except (ValueError, TypeError):
+                return None, f"Invalid page count for ISBN {isbn}"
+
+        average_rating = None
+        if average_rating_str:
+            try:
+                average_rating = float(average_rating_str)
+            except (ValueError, TypeError):
+                return None, f"Invalid average rating for ISBN {isbn}"
+
+        rating_count = None
+        if rating_count_str:
+            try:
+                rating_count = int(rating_count_str)
+            except (ValueError, TypeError):
+                return None, f"Invalid rating count for ISBN {isbn}"
+
+        # Return a dictionary of cleaned data
+        return {
+            'title': title,
+            'author': author,
+            'isbn': str(isbn).strip(),
+            'start_date': start_date,
+            'finish_date': finish_date,
+            'want_to_read': want_to_read,
+            'library_only': library_only,
+            'description': description,
+            'published_date': published_date,
+            'page_count': page_count,
+            'categories': categories,
+            'publisher': publisher,
+            'language': language,
+            'average_rating': average_rating,
+            'rating_count': rating_count
+        }, None
+
+    except Exception as e:
+        # Catch any other unexpected errors during row processing
+        return None, f"An unexpected error occurred: {e}"

@@ -53,5 +53,21 @@
             </form>
         </div>
     </div>
+
+    <!-- Import from Excel Section -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <h3 class="card-title">Import from Excel</h3>
+            <p class="card-text">Upload an Excel file to import books from your library.</p>
+            <form action="{{ url_for('main.import_excel') }}" method="post" enctype="multipart/form-data">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                <div class="mb-3">
+                    <label for="excel_file" class="form-label">Upload Excel File</label>
+                    <input type="file" class="form-control" name="excel_file" id="excel_file" accept=".xlsx" required>
+                </div>
+                <button type="submit" class="btn btn-primary w-100 w-sm-auto">Import from Excel</button>
+            </form>
+        </div>
+    </div>
 </div>
 {% endblock %}

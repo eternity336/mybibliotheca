@@ -156,6 +156,79 @@ def assign_existing_books_to_admin():
         print(f"⚠️  Failed to assign orphaned books to admin: {e}")
         db.session.rollback()
 
+def run_comment_isbn_migration(inspector, db_engine):
+    """Migrate comments to be indexed by ISBN instead of book_id."""
+    if 'comment' not in inspector.get_table_names():
+        return  # Comment table doesn't exist yet
+
+    try:
+        columns = [column['name'] for column in inspector.get_columns('comment')]
+        
+        if 'book_isbn' not in columns and 'book_id' in columns:
+            print("🔄 Migrating comments to use ISBN...")
+            with db_engine.connect() as conn:
+                # Add the book_isbn column
+                conn.execute(text("ALTER TABLE comment ADD COLUMN book_isbn VARCHAR(13)"))
+                print("✅ Added book_isbn column to comment table")
+
+                # Populate the book_isbn column
+                conn.execute(text("UPDATE comment SET book_isbn = (SELECT isbn FROM book WHERE book.id = comment.book_id)"))
+                print("✅ Populated book_isbn column with data from book table")
+
+                # Drop the book_id column
+                conn.execute(text("ALTER TABLE comment DROP COLUMN book_id"))
+                print("✅ Dropped book_id column from comment table")
+                
+                conn.commit()
+            print("✅ Comment ISBN migration completed.")
+        elif 'book_isbn' in columns and 'book_id' not in columns:
+            print("✅ Comments are already indexed by ISBN.")
+        elif 'book_isbn' not in columns and 'book_id' not in columns:
+            # This case might happen if the table is created from scratch with the new model
+            print("✅ Comment table is already up-to-date (no book_id column found).")
+        else:
+            print("✅ Comment table is already up-to-date.")
+
+    except Exception as e:
+        print(f"⚠️  Comment ISBN migration failed: {e}")
+
+def run_reading_log_isbn_migration(inspector, db_engine):
+    """Migrate reading_logs to be indexed by ISBN instead of book_id."""
+    if 'reading_log' not in inspector.get_table_names():
+        return # Reading log table doesn't exist yet
+
+    try:
+        columns = [column['name'] for column in inspector.get_columns('reading_log')]
+
+        if 'book_isbn' not in columns and 'book_id' in columns:
+            print("🔄 Migrating reading logs to use ISBN...")
+            with db_engine.connect() as conn:
+                # Add the book_isbn column
+                conn.execute(text("ALTER TABLE reading_log ADD COLUMN book_isbn VARCHAR(13)"))
+                print("✅ Added book_isbn column to reading_log table")
+
+                # Populate the book_isbn column
+                conn.execute(text("UPDATE reading_log SET book_isbn = (SELECT isbn FROM book WHERE book.id = reading_log.book_id)"))
+                print("✅ Populated book_isbn column with data from book table")
+
+                # Drop the book_id column
+                conn.execute(text("ALTER TABLE reading_log DROP COLUMN book_id"))
+                print("✅ Dropped book_id column from reading_log table")
+
+                conn.commit()
+            print("✅ Reading log ISBN migration completed.")
+        elif 'book_isbn' in columns and 'book_id' not in columns:
+            print("✅ Reading logs are already indexed by ISBN.")
+        elif 'book_isbn' not in columns and 'book_id' not in columns:
+            # This case might happen if the table is created from scratch with the new model
+            print("✅ Reading log table is already up-to-date (no book_id column found).")
+        else:
+            print("✅ Reading log table is already up-to-date.")
+
+    except Exception as e:
+        print(f"⚠️  Reading log ISBN migration failed: {e}")
+
+
 def create_app():
     app = Flask(__name__)
     app.config.from_object(Config)
@@ -329,7 +402,13 @@ def create_app():
                         
                 except Exception as e:
                     print(f"⚠️  Reading log migration failed: {e}")
-        
+            
+            # Run comment ISBN migration
+            run_comment_isbn_migration(inspector, db.engine)
+
+            # Run reading log ISBN migration
+            run_reading_log_isbn_migration(inspector, db.engine)
+
         print("🎉 Database migration completed successfully!")
 
     # Add middleware to check for setup and forced password changes

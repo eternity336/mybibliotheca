@@ -11,8 +11,152 @@ import pytz
 import csv # Ensure csv is imported
 import calendar
 from sqlalchemy import or_
+import openpyxl
 
 bp = Blueprint('main', __name__)
+
+
+@bp.route('/export/excel')
+@login_required
+def export_excel():
+    workbook = openpyxl.Workbook()
+    workbook.remove(workbook.active)  # Remove default sheet
+
+    # Export Users
+    user_sheet = workbook.create_sheet(title='Users')
+    user_headers = [
+        'id', 'username', 'email', 'is_admin', 'is_active',
+        'reading_streak_offset', 'share_current_reading',
+        'share_reading_activity', 'share_library', 'created_at'
+    ]
+    user_sheet.append(user_headers)
+
+    if current_user.is_admin:
+        users = User.query.all()
+    else:
+        users = [current_user]
+
+    for user in users:
+        user_row = [
+            user.id,
+            user.username,
+            user.email,
+            user.is_admin,
+            user.is_active,
+            user.reading_streak_offset,
+            user.share_current_reading,
+            user.share_reading_activity,
+            user.share_library,
+            user.created_at.strftime('%Y-%m-%d %H:%M:%S') if user.created_at else ''
+        ]
+        user_sheet.append(user_row)
+
+    # Export Books
+    book_sheet = workbook.create_sheet(title='Books')
+    book_headers = [
+        'id', 'uid', 'user_id', 'title', 'author', 'isbn', 'start_date', 'finish_date',
+        'want_to_read', 'library_only', 'description', 'published_date',
+        'page_count', 'categories', 'publisher', 'language', 'average_rating',
+        'rating_count', 'cover_url', 'created_at'
+    ]
+    book_sheet.append(book_headers)
+
+    if current_user.is_admin:
+        books = Book.query.all()
+    else:
+        books = Book.query.filter_by(user_id=current_user.id).all()
+
+    for book in books:
+        book_row = [
+            book.id,
+            book.uid,
+            book.user_id,
+            book.title,
+            book.author,
+            book.isbn,
+            book.start_date,
+            book.finish_date,
+            book.want_to_read,
+            book.library_only,
+            book.description,
+            book.published_date,
+            book.page_count,
+            book.categories,
+            book.publisher,
+            book.language,
+            book.average_rating,
+            book.rating_count,
+            book.cover_url,
+            book.created_at.strftime('%Y-%m-%d %H:%M:%S') if book.created_at else ''
+        ]
+        book_sheet.append(book_row)
+
+    # Export Comments
+    comment_sheet = workbook.create_sheet(title='Comments')
+    comment_headers = ['id', 'user_id', 'book_isbn', 'text', 'created_at']
+    comment_sheet.append(comment_headers)
+
+    if current_user.is_admin:
+        comments = Comment.query.all()
+    else:
+        # This logic is flawed if books are not loaded before this.
+        # A safer approach is to query books if not already done.
+        if 'books' not in locals():
+            if current_user.is_admin:
+                books = Book.query.all()
+            else:
+                books = Book.query.filter_by(user_id=current_user.id).all()
+        
+        book_isbns = [book.isbn for book in books]
+        comments = Comment.query.filter(Comment.book_isbn.in_(book_isbns)).all()
+
+    for comment in comments:
+        comment_row = [
+            comment.id,
+            comment.user_id,
+            comment.book_isbn,
+            comment.text,
+            comment.created_at.strftime('%Y-%m-%d %H:%M:%S') if comment.created_at else ''
+        ]
+        comment_sheet.append(comment_row)
+
+    # Export ReadingLogs
+    reading_log_sheet = workbook.create_sheet(title='ReadingLogs')
+    reading_log_headers = ['id', 'user_id', 'book_isbn', 'date', 'created_at']
+    reading_log_sheet.append(reading_log_headers)
+
+    if current_user.is_admin:
+        reading_logs = ReadingLog.query.all()
+    else:
+        if 'books' not in locals():
+            if current_user.is_admin:
+                books = Book.query.all()
+            else:
+                books = Book.query.filter_by(user_id=current_user.id).all()
+
+        book_isbns = [book.isbn for book in books]
+        reading_logs = ReadingLog.query.filter(ReadingLog.book_isbn.in_(book_isbns)).all()
+
+    for log in reading_logs:
+        log_row = [
+            log.id,
+            log.user_id,
+            log.book_isbn,
+            log.date.strftime('%Y-%m-%d') if log.date else '',
+            log.created_at.strftime('%Y-%m-%d %H:%M:%S') if log.created_at else ''
+        ]
+        reading_log_sheet.append(log_row)
+
+    output = BytesIO()
+    workbook.save(output)
+    output.seek(0)
+
+    return send_file(
+        output,
+        as_attachment=True,
+        download_name='bibliotheca_export.xlsx',
+        mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    )
 
 @bp.route('/log_book', methods=['POST'])
 @login_required
@@ -248,14 +392,14 @@ def view_book(uid):
         comment = Comment(
             text=form.text.data,
             user_id=current_user.id,
-            book_id=book.id
+            book_isbn=book.isbn
         )
         db.session.add(comment)
         db.session.commit()
         flash('Your comment has been added.', 'success')
         return redirect(url_for('main.view_book', uid=book.uid))
 
-    comments = Comment.query.filter_by(book_id=book.id).order_by(Comment.created_at.desc()).all()
+    comments = Comment.query.filter_by(book_isbn=book.isbn).order_by(Comment.created_at.desc()).all()
 
     return render_template('view_book.html', book=book, cover_url=cover_url, comments=comments, form=form)
 
@@ -275,11 +419,11 @@ def log_reading(uid):
         now_tz = datetime.now(timezone)
         log_date = now_tz.date()
     
-    existing_log = ReadingLog.query.filter_by(book_id=book.id, date=log_date).first()
+    existing_log = ReadingLog.query.filter_by(book_isbn=book.isbn, date=log_date).first()
     if existing_log:
         flash('You have already logged reading for this day.')
     else:
-        log = ReadingLog(book_id=book.id, date=log_date, user_id=current_user.id)
+        log = ReadingLog(book_isbn=book.isbn, date=log_date, user_id=current_user.id)
         db.session.add(log)
         db.session.commit()
         flash('Reading day logged.')
@@ -289,7 +433,7 @@ def log_reading(uid):
 @login_required
 def delete_book(uid):
     book = Book.query.filter_by(uid=uid, user_id=current_user.id).first_or_404()
-    ReadingLog.query.filter_by(book_id=book.id).delete()
+    ReadingLog.query.filter_by(book_isbn=book.isbn).delete()
     db.session.delete(book)
     db.session.commit()
     flash('Book deleted successfully.')
@@ -687,6 +831,103 @@ def import_goodreads():
     db.session.commit()
     flash(f'Imported {imported} books from Goodreads.', 'success')
     return redirect(url_for('main.add_book'))
+
+
+@bp.route('/import/excel', methods=['POST'])
+@login_required
+def import_excel():
+    file = request.files.get('excel_file')
+    if not file or not file.filename.endswith('.xlsx'):
+        flash('Please upload a valid Excel file.', 'danger')
+        return redirect(url_for('main.bulk_import'))
+
+    workbook = openpyxl.load_workbook(file)
+    if 'Books' not in workbook.sheetnames:
+        flash('The uploaded Excel file does not contain a "Books" sheet.', 'danger')
+        return redirect(url_for('main.bulk_import'))
+    sheet = workbook['Books']
+
+    imported_count = 0
+    failed_count = 0
+    failed_isbns = []
+
+    for row in sheet.iter_rows(min_row=2, values_only=True):
+        isbn = None # Initialize isbn here
+        try:
+            if len(row) < 20:
+                # Try to get ISBN for a more helpful error message
+                if len(row) > 5 and row[5]:
+                    failed_isbns.append(f"{row[5]} (error: incorrect column count, expected 20 got {len(row)})")
+                else:
+                    failed_isbns.append(f"(unknown row) (error: incorrect column count, expected 20 got {len(row)})")
+                failed_count += 1
+                continue
+
+            _id, _uid, _user_id, title, author, isbn, start_date_str, finish_date_str, want_to_read_str, library_only_str, description, published_date, page_count_str, categories, publisher, language, average_rating_str, rating_count_str, cover_url, _created_at = row
+
+            if not isbn:
+                failed_count += 1
+                failed_isbns.append('(empty ISBN)')
+                continue
+
+            if Book.query.filter_by(isbn=isbn, user_id=current_user.id).first():
+                failed_count += 1
+                failed_isbns.append(f"{isbn} (already exists)")
+                continue
+
+            # Data conversion and validation
+            if isinstance(start_date_str, datetime):
+                start_date = start_date_str.date()
+            else:
+                start_date = datetime.strptime(start_date_str, '%Y-%m-%d').date() if start_date_str else None
+
+            if isinstance(finish_date_str, datetime):
+                finish_date = finish_date_str.date()
+            else:
+                finish_date = datetime.strptime(finish_date_str, '%Y-%m-%d').date() if finish_date_str else None
+            
+            want_to_read = str(want_to_read_str).lower() in ['true', '1', 'yes']
+            library_only = str(library_only_str).lower() in ['true', '1', 'yes']
+            
+            page_count = int(page_count_str) if page_count_str is not None else None
+            average_rating = float(average_rating_str) if average_rating_str is not None else None
+            rating_count = int(rating_count_str) if rating_count_str is not None else None
+
+            book = Book(
+                title=title,
+                author=author,
+                isbn=isbn,
+                user_id=current_user.id,
+                start_date=start_date,
+                finish_date=finish_date,
+                want_to_read=want_to_read,
+                library_only=library_only,
+                description=description,
+                published_date=published_date,
+                page_count=page_count,
+                categories=categories,
+                publisher=publisher,
+                language=language,
+                average_rating=average_rating,
+                rating_count=rating_count,
+                cover_url=cover_url
+            )
+            db.session.add(book)
+            imported_count += 1
+        except Exception as e:
+            failed_count += 1
+            isbn_for_error = isbn if isbn else '(unknown)'
+            failed_isbns.append(f"{isbn_for_error} (error: {e})")
+            current_app.logger.error(f"Failed to import row: {row}, error: {e}")
+
+    db.session.commit()
+
+    if imported_count > 0:
+        flash(f'Successfully imported {imported_count} books from Excel.', 'success')
+    if failed_count > 0:
+        flash(f'Failed to import {failed_count} books: {", ".join(failed_isbns)}', 'danger')
+
+    return redirect(url_for('main.bulk_import'))
 
 @bp.route('/download_db', methods=['GET'])
 @login_required
